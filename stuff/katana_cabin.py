@@ -10,7 +10,8 @@ import threading
 import RPi.GPIO as GPIO
 from time import sleep
 
-sys.path.append(os.getcwd() + '/../CAN')
+sys.path.append(sys.path[0] + '/../CAN')
+
 import can_handler
 
 
