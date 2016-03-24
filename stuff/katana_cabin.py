@@ -10,36 +10,34 @@ import threading
 import RPi.GPIO as GPIO
 from time import sleep
 
-sys.path.append(os.getcwd() + '..\CAN')
+sys.path.append(os.getcwd() + '/../CAN')
 import can_handler
 
 
 class GPIO_Reader():
     def __init__(self):
         self.configureGPIO()
-        self.initUI()
-        self.low_input = 0
-        self.high_input = 0
+        self.low_input = False
+        self.high_input = False
+	self.period = 0.1
 
     def configureGPIO(self):
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(23, GPIO.IN)
-        GPIO.setup(24, GPIO.IN)
-        GPIO.setup(25, GPIO.IN)
+        GPIO.setup(19, GPIO.IN)
+        GPIO.setup(26, GPIO.IN)
 
-    def check_inputs(self, period):
-        self.low_input = GPIO.input(25)
-        self.high_input = GPIO.input(24)
-
-        self.th_reader = threading.Timer(period, self.check_inputs)
-
+    def check_inputs(self):
+        self.low_input = GPIO.input(26)
+        self.high_input = GPIO.input(19)
+        self.th_reader = threading.Timer(self.period, self.check_inputs)
+	self.th_reader.start()
 
 if __name__ == '__main__':
 
     reader = GPIO_Reader()
-    reader.check_inputs(0.1)  # starts a thread
+    reader.check_inputs()  # starts a thread
 
-    can_h = can_handler()
+    can_h = can_handler.can_handler()
     can_h.configure('J1939')
 
     msg_ID = 0x1CFDCD00
@@ -51,18 +49,18 @@ if __name__ == '__main__':
 
     '''actions'''
     while True:
-        low = reader.low_input
-        high = reader.high_input
+        low = not reader.low_input
+        high = not reader.high_input
 
-        if (low==0 and high==0):
+        if (low is False and high is False):
             print "STOP"
             can_h.send_msg(msg_stop, msg_ID)
-        if (low==1 and high==0):
+        elif (low is True and high is False):
             print "low speed"
             can_h.send_msg(msg_low, msg_ID)
-        elif (low==0 and high==1):
+        elif (low is False and high is True):
             print "high speed: not avaliable in katana"
-        elif (low==1 and high==1):
+        elif (low is True and high is True):
             print "intermittence"
             can_h.send_msg(msg_intermittence3s, msg_ID)
         else:
