@@ -43,8 +43,8 @@ class can_handler():
     def configure(self):
         '''Function to open channel, set bitrate, and enable bus'''
 
-        if self.canLib.getNumberOfChannels() < 3:
-            print 'CAN driver not found'
+        if self.canLib.getNumberOfChannels() < 3:            
+            print 'CAN driver not found, number of channels: ', self.canLib.getNumberOfChannels()
         else:
             try:
 #                 self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_REQUIRE_EXTENDED + canlib.canOPEN_ACCEPT_VIRTUAL)
@@ -63,7 +63,7 @@ class can_handler():
         print "write: ", msg_writen
         try:
             self.ch1.write(msgId, msg, flg)
-#             sleep(0.5)
+            sleep(0.002)
         except (self.canLib.canNoMsg) as ex:
             None
         except (self.canLib.canError) as ex:
@@ -112,8 +112,8 @@ def grade_plane_actions(can_h):
     can_h.send_msg([0x01, 0x00], 0x00)# from pre-operational to operational
 
     msg_clear_error = (0x2f, 0x02, 0x21, 0x01, 0x01, 0x00, 0x00, 0x00)
-#     msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x02, 0x00, 0x00, 0x00)
-    msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x01, 0x00, 0x00, 0x00)#position mode
+    msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x02, 0x00, 0x00, 0x00)#speed mode
+#     msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x01, 0x00, 0x00, 0x00)#position mode
     msg_set_speed = (0x23, 0x01, 0x22, 0x00, 0x1a, 0x4f, 0x00, 0x00)
 #     msg_set_speed = (0x23, 0x01, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00)
     msg_break_on = (0x2f, 0x04, 0x21, 0x00, OFF, 0x00, 0x00, 0x00)
@@ -128,7 +128,7 @@ def grade_plane_actions(can_h):
 
     for msg in write_buffer:
         can_h.send_msg(msg, msgId)
-        can_h.read_msg_and_print()
+#         can_h.read_msg_and_print()
 
     sleep(1)
 #     can_h.stop_heartbeat()
@@ -137,24 +137,29 @@ def grade_plane_actions(can_h):
 
 
 if __name__ == '__main__':
+
+    msg_clear_error = (0x2f, 0x02, 0x21, 0x01, 0x01, 0x00, 0x00, 0x00)
+    msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x02, 0x00, 0x00, 0x00)#speed mode
+    msg_set_speed = (0x23, 0x01, 0x22, 0x00, 0x1a, 0x4f, 0x00, 0x00)
+    msg_break_on = (0x2f, 0x04, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00)
+    msg_set_heartbeat = (0x23, 0x16, 0x10, 0x01, 0xdc, 0x05, 0x64, 0x00)
+    write_buffer = (msg_mode_speed, msg_set_speed, msg_break_on, msg_set_heartbeat, msg_clear_error)
+
     can_h = can_handler()
     can_h.configure()
 
     '''actions'''
-    grade_plane_actions(can_h)
-#     can_h.reader_start()
-#     sleep(2)
-# 
-#     pgn = periodic_frame_sender(can_h=can_h, period=0.5,
-#                                                   msgId=0x1CFDCD00, msg=[0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-#     pgn.start_frame()
-#     sleep(1)
-#     pgn.msg = (0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
-#     sleep(2)
+    while True:
+        can_h.send_msg([0x01, 0x00], 0x00)
+        for msg in write_buffer:
+            can_h.send_msg(msg, 0x601)
+        sleep(0.020)
+        can_h.send_msg([0x7F], 0x764)
+        sleep(1)
 
-    '''final'''
-#     pgn.stop_frame()
-#     can_h.stop_reader()
-#     grader_ID = 0x1CFDE8FC
-#     msg_grader = (0xD4, 0x00, 0x12, 0x00, 0x00, 0x12, 0x02, 0x01)
+
+
+#     grade_plane_actions(can_h)
+    #     can_h.reader_start()
+
     print '**** END PROGRAM ****'

@@ -10,14 +10,24 @@ class greate_plains():
     def __init__(self, can_h, node_id):
         self.can_h = can_h
         self.node_id = node_id
+        self.heartbeat = None
     
-    '''***************************    falta por implementar el heartbeat    *********************************'''
-        
     def bytes(self, integer):
+        '''usefull function to split high and low byte'''
         return divmod(integer, 0x100)
+        
+    def heartbeat_start(self):
+        self.heartbeat = can_handler.periodic_frame_sender(can_h=can_h, period=1, msgId=0x764, msg=[0x7F])
+        self.heartbeat.start_frame()
+        
+    def heartbeat_stop(self):
+        self.heartbeat.stop_frame()
+        
+    def heartbeat_frame_send(self):
+        self.can_h.send_msg(([0x7F]), 0x764)
     
     def set_operational(self):
-        self.can_h.send_msg([0x01, 0x00], 0x00)
+        self.can_h.send_msg(([0x01, 0x00]), 0x00)
         
     def reset_node(self):
         '''to be implemented'''
@@ -63,6 +73,17 @@ class test():
     def approx_Equal(self, x, y, tolerance):
         return abs(x-y) <= tolerance
     
+    def setup(self):
+        self.gp_obj.set_operational()
+        self.gp_obj.set_heartbeat(1500)
+        self.gp_obj.set_brake(0)
+        self.gp_obj.heartbeat_start()
+        self.gp_obj.clear_errors()        
+    
+    def teardown(self):
+        self.gp_obj.set_speed(0)
+        self.gp_obj.heartbeat_stop()
+        
     def test1(self):
         '''doc: to check the boot-up message every 5sec'''        
         last_time = 0
@@ -95,14 +116,34 @@ class test():
         sleep(2)
         self.gp_obj.set_speed(60)
         #wait_till_target_reached and get speed from time: should be 30s, if it is less than 30s is fail (because accept speed change)
-        
+
+    def test4(self):
+        self.gp_obj.set_mode(1)
+        self.gp_obj.set_speed(30)
+        self.gp_obj.set_pos_target(10)
         
 if __name__ == '__main__':
     can_h = can_handler.can_handler()
     can_h.configure()
 
     test_obj = test(can_h)
-    test_obj.test3()
-    '''function for debug stage'''
+#     while True:  
+#     test_obj.setup()    
+#     test_obj.test4()
+#     sleep(4)
     
+    '''test to execute: configure'''
+    while True:
+        test_obj.gp_obj.set_operational()
+        test_obj.gp_obj.set_heartbeat(1500)
+        test_obj.gp_obj.heartbeat_frame_send()
+        test_obj.gp_obj.set_brake(0)        
+        test_obj.gp_obj.clear_errors() 
+          
+        test_obj.gp_obj.set_mode(2)
+        test_obj.gp_obj.set_speed(60)        
+        sleep(1)
+    
+    '''teardown'''
+#     test_obj.teardown()
     print '**** END PROGRAM ****'
