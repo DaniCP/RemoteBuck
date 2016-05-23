@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import sys, os
 from time import sleep
+import time
 from bitstring import BitString, BitArray
 
-sys.path.append(os.getcwd() + '\..\..\CAN') #anadir para linux
+sys.path.append(os.getcwd() + '\..\..\CAN')
 import can_handler
 
 class greate_plains():
@@ -56,7 +57,7 @@ class greate_plains():
         '''speed argument in shaft'''
         speed_armature = speed * 81 * 10
         high, low = self.bytes(speed_armature)
-        print hex(high), hex(low)
+#         print hex(high), hex(low)
         self.can_h.send_msg((0x23, 0x01, 0x22, 0x00, low, high, 0x00, 0x00), self.node_id)
         
     def set_pos_target(self, pos):
@@ -64,6 +65,41 @@ class greate_plains():
         pos_armature = pos * 81
         high, low = self.bytes(pos_armature)
         self.can_h.send_msg((0x23, 0x7a, 0x60, 0x00, low, high, 0x00, 0x00), self.node_id)
+        
+    def get_actual_speed(self):
+        '''returned speed in shaft'''
+        self.can_h.send_msg((0x40, 0x02, 0x22, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+        msg, msgId, time = self.can_h.read_msg()
+        
+        while not (msg[0]==0x43 and msg[1]==0x02 and msg[2]==0x22):
+            msg, msgId, time = self.can_h.read_msg()
+            
+        speed = BitString("0x%02x " % msg[5])
+        speed.append("0x%02x " % msg[4])
+        return speed.uint/810.0
+    
+    def get_target_reached(self):
+        '''returned true/false'''
+        self.can_h.send_msg((0x40, 0x41, 0x60, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+        msg, msgId, time = self.can_h.read_msg()
+        
+        while not (msg[0]==0x4b and msg[1]==0x41 and msg[2]==0x60):
+            msg, msgId, time = self.can_h.read_msg()
+            
+        target_reached = BitString("0x%02x " % msg[5]) 
+        return target_reached.bin[5] 
+    
+    def wait_till_error(self, timeout):
+#         self.can_h.send_msg((0x40, 0x41, 0x60, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+        msg, msgId, time = None, None, None
+        
+        while not (msgId==0x081 and msg[0]==0x30 and msg[1]==0x81):
+            msg, msgId, time = self.can_h.read_msg(timeout)
+            
+        error_code = BitString("0x%02x " % msg[1])
+        error_code.append("0x%02x " % msg[0])
+        return error_code
+        
         
 class test():
     def __init__(self, can_h):
@@ -105,45 +141,112 @@ class test():
         msg, msgId, time = self.can_h.read_msg(6000)
         if (msgId == 0x701):
             can_h.send_msg([0x01, 0x00], 0x00)# from pre-operational to operational
-        '''to be completed'''   
-
-    def test3(self):
-        '''to cover issue GPSEEDER-1'''
+        '''to be completed'''
+               
+    '''POSITION CONTROL TESTS'''
+    def test_pos_1(self):
+        '''to cover issue GPSEEDER-1
+            changes during process are ignored 
+            (not ignored, performed after finisth the first target)'''
         self.gp_obj.set_mode(1)#position mode
         self.gp_obj.set_speed(10)
         self.gp_obj.set_pos_target(5)      
         #start_time_to_target_reached()
-        sleep(2)
+        sleep(5)
         self.gp_obj.set_speed(60)
+        self.gp_obj.set_pos_target(3)
         #wait_till_target_reached and get speed from time: should be 30s, if it is less than 30s is fail (because accept speed change)
-
-    def test4(self):
+        sleep(25)
+        
+    def test_pos_2(self):
+        '''check max pos allowed is 5 rev'''
         self.gp_obj.set_mode(1)
         self.gp_obj.set_speed(30)
         self.gp_obj.set_pos_target(10)
+        sleep(25)
+    
+    def periodic_test(self):
+        while True:
+            self.gp_obj.set_operational()
+            self.gp_obj.set_heartbeat(1500)
+            self.gp_obj.heartbeat_frame_send()
+            self.gp_obj.set_brake(0)        
+            self.gp_obj.clear_errors() 
+              
+            self.gp_obj.set_mode(2)
+            self.gp_obj.set_speed(60)        
+            sleep(1)
+            
+    def test_pos_3(self):
+        '''to check the 60 rev/seg acceleration: use oscilloscope to measure stabilization current time'''
+        self.gp_obj.set_mode(1)
+        self.gp_obj.set_speed(60)
+        for i in range(0,5):
+            self.gp_obj.set_pos_target(2)
+            sleep(3)
+
+    def test_vel_1(self):
+        '''check acceleration and command works'''
+        self.gp_obj.set_mode(2)
+        self.gp_obj.set_speed(30)
+        sleep(5)
+        self.gp_obj.set_speed(60)
+        sleep(5)
         
+    def test_vel_2(self):
+        '''check target reached when +-2 rpm'''
+        speed_target = 60
+        self.gp_obj.set_mode(2)
+        self.gp_obj.set_speed(speed_target)
+        time_start = time.time()
+        while not self.gp_obj.get_target_reached()=='1':
+#             print time.time()
+#             print self.gp_obj.get_actual_speed()
+            sleep(0.050)
+        actual_speed = self.gp_obj.get_actual_speed()
+        time_spent = time.time() - time_start
+        print "actual speed:", actual_speed, "accuracy: ", abs(speed_target - actual_speed)
+        print "time spent to reach the target: ", time_spent
+        
+    def test_vel_new(self):
+        '''investigando'''        
+        self.gp_obj.set_mode(2)
+        self.gp_obj.set_speed(30)
+        sleep(5)
+        for i in range(0,10):
+            self.gp_obj.set_pos_target(5)
+            sleep(1)
+                    
+        self.gp_obj.set_speed(0)
+        print "now is stopped"
+        self.gp_obj.set_mode(1)
+        sleep(15)    
+        
+    '''CANOpen interface tests'''
+    def test_interf_1(self):
+        '''1080: check consumer heartbeat can be modified'''
+        self.gp_obj.set_heartbeat(3000)
+        sleep(5)
+        self.gp_obj.heartbeat_stop()
+        self.gp_obj.heartbeat_frame_send()
+        time_start = time.time()
+        error_code = self.gp_obj.wait_till_error(5000)
+        print "time_spent: ", time.time() - time_start, "error code:", error_code, "\nshould be 3s and 0x8130"
+        
+    def test_interf_2(self):
+        '''Node ID: 0x2000'''
+        write_node_id2 = (0x2f, 0x00, 0x20, 0x00, 0x02, 0x00, 0x00)
+    
 if __name__ == '__main__':
     can_h = can_handler.can_handler()
     can_h.configure()
 
     test_obj = test(can_h)
-#     while True:  
-#     test_obj.setup()    
-#     test_obj.test4()
-#     sleep(4)
-    
+  
     '''test to execute: configure'''
-    while True:
-        test_obj.gp_obj.set_operational()
-        test_obj.gp_obj.set_heartbeat(1500)
-        test_obj.gp_obj.heartbeat_frame_send()
-        test_obj.gp_obj.set_brake(0)        
-        test_obj.gp_obj.clear_errors() 
-          
-        test_obj.gp_obj.set_mode(2)
-        test_obj.gp_obj.set_speed(60)        
-        sleep(1)
-    
+    test_obj.setup()    
+#     test_obj.test_interf_1()
+    test_obj.test_vel_new()
     '''teardown'''
-#     test_obj.teardown()
+    test_obj.teardown()
     print '**** END PROGRAM ****'

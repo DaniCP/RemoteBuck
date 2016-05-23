@@ -15,7 +15,7 @@ import canlib
 class periodic_frame_sender():
     def __init__(self, can_h=None, period=None, msgId=None, msg=None):
         self.can_h = can_h
-        self.period = period
+        self.period = period # seconds
         self.msgId = msgId
         self.msg = msg
 
@@ -60,14 +60,18 @@ class can_handler():
         msg_writen = "".join("0x%02x " %  b for b in msg)
 #         flg = canlib.canMSG_EXT
         flg = 0
-        print "write: ", msg_writen
+#         print "write: ", msg_writen
         try:
             self.ch1.write(msgId, msg, flg)
-            sleep(0.002)
-        except (self.canLib.canNoMsg) as ex:
-            None
-        except (self.canLib.canError) as ex:
-            print(ex)
+            sleep(0.005)
+        except:
+            print "*************************    EXCEPTION WHILE WRITE    **********************"
+            sleep(0.3)
+            self.ch1.write(msgId, msg, flg)
+#         except (self.canLib.canNoMsg) as ex:
+#             None
+#         except (self.canLib.canError) as ex:
+#             print(ex)
 
     def read_msg_and_print(self):
         msgId, msg, dlc, flg, time = self.ch1.read(timeout=2000)
@@ -157,9 +161,6 @@ if __name__ == '__main__':
         can_h.send_msg([0x7F], 0x764)
         sleep(1)
 
-
-
 #     grade_plane_actions(can_h)
     #     can_h.reader_start()
-
     print '**** END PROGRAM ****'
