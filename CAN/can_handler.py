@@ -47,7 +47,7 @@ class can_handler():
             print 'CAN driver not found, number of channels: ', self.canLib.getNumberOfChannels()
         else:
             try:
-#                 self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_REQUIRE_EXTENDED + canlib.canOPEN_ACCEPT_VIRTUAL)
+                # self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_REQUIRE_EXTENDED + canlib.canOPEN_ACCEPT_VIRTUAL)
                 self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_ACCEPT_VIRTUAL)
                 self.ch1.setBusOutputControl(canlib.canDRIVER_NORMAL)
 #                 self.ch1.setBusParams(canlib.canBITRATE_250K)
@@ -67,6 +67,9 @@ class can_handler():
         except:
             print "*************************    EXCEPTION WHILE WRITE    **********************"
             sleep(0.3)
+            self.ch1.busOff()
+            self.ch1.close()
+            self.configure()
             self.ch1.write(msgId, msg, flg)
 #         except (self.canLib.canNoMsg) as ex:
 #             None

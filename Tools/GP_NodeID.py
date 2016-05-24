@@ -14,6 +14,7 @@ class GUI_CAN_Manager(QWidget):
         self.initUI()
         self.can_h = can_handler.can_handler()
         self.can_h.configure()
+        self.can_h.send_msg([0x01, 0x00], 0x00)  # to operational
         self.run_loop()
 
     def closeEvent(self, event):
@@ -75,28 +76,36 @@ class GUI_CAN_Manager(QWidget):
 
     def run_loop(self):
         msg_clear_error = (0x2f, 0x02, 0x21, 0x01, 0x01, 0x00, 0x00, 0x00)
-        msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x02, 0x00, 0x00, 0x00)#speed mode
-        msg_set_speed = (0x23, 0x01, 0x22, 0x00, 0x1a, 0x4f, 0x00, 0x00)
-        msg_break_on = (0x2f, 0x04, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00)
+        msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x02, 0x00, 0x00, 0x00) # speed mode
+        msg_set_speed = (0x23, 0x01, 0x22, 0x00, 0x1a, 0x4f, 0x00, 0x00) # 1a4f = 25rpm
+#         msg_break_on = (0x2f, 0x04, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00) # deprecated
         msg_set_heartbeat = (0x23, 0x16, 0x10, 0x01, 0xdc, 0x05, 0x64, 0x00)
-        write_buffer = (msg_mode_speed, msg_set_speed, msg_break_on, msg_set_heartbeat, msg_clear_error)
 
+        write_buffer = (msg_mode_speed, msg_set_speed, msg_set_heartbeat, msg_clear_error)
+
+        node_id = self.node_id_selected
+        node_id_c = 0x600 + node_id
         '''actions'''
-        node_id = 0x600 + self.node_id_selected
-        self.can_h.send_msg([0x01, 0x00], 0x00)  # to preoperational
-        for msg in write_buffer:
-            self.can_h.send_msg(msg, node_id)
-        sleep(0.020)
-        self.can_h.send_msg([0x7F], 0x764)
-
-        # detener el otro nodo
-        if self.node_id_selected == 1:
-            self.can_h.send_msg((0x23, 0x01, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00), 0x602) # speed 0
-        else:
-            self.can_h.send_msg((0x23, 0x01, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00), 0x601) # speed 0
-
-        self.th_periodic = threading.Timer(1, self.run_loop)
-        self.th_periodic.start()
+        try:
+            # detener el otro nodo
+            if node_id == 1:
+                self.can_h.send_msg((0x23, 0x01, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00), 0x602) # speed 0
+    #             for msg in write_buffer:
+    #                 self.can_h.send_msg(msg, node_id_c)
+            else:
+                self.can_h.send_msg((0x23, 0x01, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00), 0x601) # speed 0
+    #         self.can_h.send_msg([0x01, 0x00], 0x00)  # to operational
+            for msg in write_buffer:
+                self.can_h.send_msg(msg, node_id_c)
+            sleep(0.020)
+            self.can_h.send_msg([0x7F], 0x764)
+    
+            self.th_periodic = threading.Timer(1, self.run_loop)
+            self.th_periodic.start()
+        except:
+            self.th_periodic.cancel()
+            self.th_periodic = threading.Timer(1, self.run_loop)
+            self.th_periodic.start()
 
 
 if __name__ == '__main__':
