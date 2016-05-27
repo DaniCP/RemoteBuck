@@ -13,8 +13,10 @@ class GUI_CAN_Manager(QWidget):
         super(GUI_CAN_Manager, self).__init__()
         self.initUI()
         self.can_h = can_handler.can_handler()
-        self.can_h.configure()
+        self.can_h.configure('CANOpen')
         self.can_h.send_msg([0x01, 0x00], 0x00)  # to operational
+#         self.can_h.send_msg((0x2f, 0x02, 0x21, 0x01, 0x01, 0x00, 0x00, 0x00), 0x601)
+#         self.can_h.send_msg((0x2f, 0x02, 0x21, 0x01, 0x01, 0x00, 0x00, 0x00), 0x602)
         self.run_loop()
 
     def closeEvent(self, event):
@@ -98,8 +100,8 @@ class GUI_CAN_Manager(QWidget):
             for msg in write_buffer:
                 self.can_h.send_msg(msg, node_id_c)
             sleep(0.020)
-            self.can_h.send_msg([0x7F], 0x764)
-    
+            self.can_h.send_msg([0x05], 0x764) # operational
+
             self.th_periodic = threading.Timer(1, self.run_loop)
             self.th_periodic.start()
         except:

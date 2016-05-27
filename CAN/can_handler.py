@@ -40,18 +40,27 @@ class can_handler():
         self.reader_period = 0.01 #seconds
         self.old_read_msg = ''
 
-    def configure(self):
-        '''Function to open channel, set bitrate, and enable bus'''
+    def configure(self, bus_type='J1939'):
+        '''Function to open channel, set bitrate, and enable bus
+            input:    type: J1939 or CANOpen'''
 
-        if self.canLib.getNumberOfChannels() < 3:            
+        if self.canLib.getNumberOfChannels() < 1:
             print 'CAN driver not found, number of channels: ', self.canLib.getNumberOfChannels()
         else:
             try:
-                # self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_REQUIRE_EXTENDED + canlib.canOPEN_ACCEPT_VIRTUAL)
-                self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_ACCEPT_VIRTUAL)
-                self.ch1.setBusOutputControl(canlib.canDRIVER_NORMAL)
-#                 self.ch1.setBusParams(canlib.canBITRATE_250K)
-                self.ch1.setBusParams(canlib.canBITRATE_125K)
+                if bus_type == 'J1939':
+                    self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_REQUIRE_EXTENDED + canlib.canOPEN_ACCEPT_VIRTUAL)
+                    self.ch1.setBusOutputControl(canlib.canDRIVER_NORMAL)
+                    self.ch1.setBusParams(canlib.canBITRATE_250K)
+                elif bus_type == 'CANOpen':
+                    self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_ACCEPT_VIRTUAL)
+                    self.ch1.setBusOutputControl(canlib.canDRIVER_NORMAL)
+                    self.ch1.setBusParams(canlib.canBITRATE_125K)
+                else:   # default J1939
+                    self.ch1 = self.canLib.openChannel(0, canlib.canOPEN_REQUIRE_EXTENDED + canlib.canOPEN_ACCEPT_VIRTUAL)
+                    self.ch1.setBusOutputControl(canlib.canDRIVER_NORMAL)
+                    self.ch1.setBusParams(canlib.canBITRATE_250K)
+
                 self.ch1.busOn()
             except (self.canlib.canError) as ex:
                 print(ex)
@@ -63,6 +72,7 @@ class can_handler():
 #         print "write: ", msg_writen
         try:
             self.ch1.write(msgId, msg, flg)
+#             sleep(0.100)
             sleep(0.005)
         except:
             print "*************************    EXCEPTION WHILE WRITE    **********************"

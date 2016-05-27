@@ -18,7 +18,7 @@ class greate_plains():
         return divmod(integer, 0x100)
         
     def heartbeat_start(self):
-        self.heartbeat = can_handler.periodic_frame_sender(can_h=can_h, period=1, msgId=0x764, msg=[0x7F])
+        self.heartbeat = can_handler.periodic_frame_sender(can_h=self.can_h, period=1, msgId=0x764, msg=[0x7F])
         self.heartbeat.start_frame()
         
     def heartbeat_stop(self):
@@ -78,6 +78,18 @@ class greate_plains():
         speed.append("0x%02x " % msg[4])
         return speed.uint/810.0
     
+    def get_motor_current(self):
+        '''returned in milliamperes '''
+        self.can_h.send_msg((0x40, 0x01, 0x23, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+        msg, msgId, time = self.can_h.read_msg()
+        
+        while not (msg[0]==0x4b and msg[1]==0x01 and msg[2]==0x23):
+            msg, msgId, time = self.can_h.read_msg()
+            
+        current = BitString("0x%02x " % msg[5])
+        current.append("0x%02x " % msg[4])
+        return current.uint
+    
     def get_target_reached(self):
         '''returned true/false'''
         self.can_h.send_msg((0x40, 0x41, 0x60, 0x00, 00, 00, 0x00, 0x00), self.node_id)
@@ -88,6 +100,18 @@ class greate_plains():
             
         target_reached = BitString("0x%02x " % msg[5]) 
         return target_reached.bin[5] 
+   
+    def get_actual_position(self):
+        '''returned position in shaft'''
+        self.can_h.send_msg((0x40, 0x64, 0x60, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+        msg, msgId, time = self.can_h.read_msg()
+        
+        while not (msg[0]==0x43 and msg[1]==0x64 and msg[2]==0x60):
+            msg, msgId, time = self.can_h.read_msg()
+            
+        pos = BitString("0x%02x " % msg[5])
+        pos.append("0x%02x " % msg[4])
+        return pos.uint/81.0 
     
     def wait_till_error(self, timeout):
 #         self.can_h.send_msg((0x40, 0x41, 0x60, 0x00, 00, 00, 0x00, 0x00), self.node_id)
@@ -195,7 +219,7 @@ class test():
         
     def test_vel_2(self):
         '''check target reached when +-2 rpm'''
-        speed_target = 60
+        speed_target = 30
         self.gp_obj.set_mode(2)
         self.gp_obj.set_speed(speed_target)
         time_start = time.time()
@@ -239,14 +263,18 @@ class test():
     
 if __name__ == '__main__':
     can_h = can_handler.can_handler()
-    can_h.configure()
+    can_h.configure('CANOpen')
 
     test_obj = test(can_h)
   
     '''test to execute: configure'''
     test_obj.setup()    
-#     test_obj.test_interf_1()
-    test_obj.test_vel_new()
+    
+#     test_obj.test_vel_2()
+    for i in range(1,10):
+        print test_obj.gp_obj.get_motor_current()
+        sleep(1)
+        
     '''teardown'''
     test_obj.teardown()
     print '**** END PROGRAM ****'
