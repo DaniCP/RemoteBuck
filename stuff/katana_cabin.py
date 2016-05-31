@@ -20,7 +20,7 @@ class GPIO_Reader():
         self.configureGPIO()
         self.low_input = False
         self.high_input = False
-	self.period = 0.1
+        self.period = 0.1
 
     def configureGPIO(self):
         GPIO.setmode(GPIO.BCM)
@@ -31,7 +31,7 @@ class GPIO_Reader():
         self.low_input = GPIO.input(26)
         self.high_input = GPIO.input(19)
         self.th_reader = threading.Timer(self.period, self.check_inputs)
-	self.th_reader.start()
+        self.th_reader.start()
 
 if __name__ == '__main__':
 

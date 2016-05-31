@@ -270,10 +270,10 @@ if __name__ == '__main__':
     '''test to execute: configure'''
     test_obj.setup()    
     
-#     test_obj.test_vel_2()
-    for i in range(1,10):
-        print test_obj.gp_obj.get_motor_current()
-        sleep(1)
+    test_obj.test_vel_2()
+#     for i in range(1,10):
+#         print test_obj.gp_obj.get_motor_current()
+#         sleep(1)
         
     '''teardown'''
     test_obj.teardown()

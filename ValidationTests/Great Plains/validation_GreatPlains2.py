@@ -4,6 +4,7 @@ import sys, os
 from time import sleep
 import time
 from bitstring import BitString, BitArray
+from lib2to3.pgen2.token import RPAR
 
 sys.path.append(os.getcwd() + '\..\..\CAN')
 import can_handler
@@ -35,7 +36,7 @@ class VelocityControlTestCase(unittest.TestCase):
         self.gp_obj.set_speed(speed_target)
         time_start = time.time()
         timeout = 10 # seconds
-        while (not self.gp_obj.get_target_reached()=='1' or time.time()-time_start>timeout):
+        while (not self.gp_obj.get_target_reached()=='1' and time.time()-time_start<timeout):
             sleep(0.050)
          
         actual_speed = self.gp_obj.get_actual_speed()
@@ -96,7 +97,66 @@ class PositionControlTestCase(unittest.TestCase):
         self.gp_obj.set_speed(0)
         self.gp_obj.heartbeat_stop()
         
-    def test_position_accuracy(self):
+    def _test_move_to_pos_using_velocity_command(self):
+        speed_list = [60, 30, 10]
+        tol_per = 15    #    tolerance percentage
+        in_progress_speed_list = []
+        pos_target = 5
+        for i in speed_list:            
+            self.gp_obj.set_speed(i)
+            self.gp_obj.set_pos_target(pos_target)
+            time_start = time.time()
+            while (not self.gp_obj.get_target_reached()=='1'):
+                sleep(0.100)
+            time_spent = time.time() - time_start
+            rpm = pos_target * 60 /time_spent
+            print "real rpms: ", rpm
+            assert rpm < i+tol_per*i/100.0 and rpm > i-tol_per*i/100.0
+            
+    def _test_target_higher_than_allowed(self):
+        max_allowed = 5
+        self.gp_obj.set_pos_target(8)
+        while (not self.gp_obj.get_target_reached()=='1'):
+                sleep(0.050)
+        sleep(1)
+        actual_pos = self.gp_obj.get_actual_position()
+        assert actual_pos == max_allowed
+    
+    def test_process_new_speed_after_finish(self):                    
+        pos_target = 5
+        tol_per = 15    # percentage tolerance
+        timeout = False
+        self.gp_obj.set_speed(10)
+        self.gp_obj.set_pos_target(pos_target)
+        time_start = time.time()
+        only_one_flag = False
+        while ((not self.gp_obj.get_target_reached()=='1') and not timeout):
+            sleep(0.100)
+#             if only_one_flag is False:
+            self.gp_obj.set_speed(60)
+            if (time.time()-time_start>40):
+                timeout = True
+                assert False, "timeout while waiting for target reached"
+#                 only_one_flag = True
+        time_spent = time.time() - time_start
+        rpm = pos_target * 60 /time_spent
+        print "real rpms: ", rpm
+        assert rpm < 10+tol_per*10/100.0 and rpm > 10-tol_per*10/100.0
+        
+#         self.gp_obj.set_pos_target(pos_target)
+#         time_start = time.time()
+#         while (not self.gp_obj.get_target_reached()=='1' and time.time()-time_start<10):
+#             sleep(0.100)
+#         time_spent = time.time() - time_start
+#         rpm = pos_target * 60 /time_spent
+#         print "real rpms: ", rpm
+#         assert rpm < 60+tol_per*60/100.0 and rpm > 60-tol_per*60/100.0
+        
+    def test_process_new_pos_target_after_finish(self):
+        pass
+    
+    def _test_position_accuracy(self):
+        ''' improvement: should be checked externally, internally always get error 0'''
         target_list = [1,2,3,4,5]
         result_list = []
         for i in target_list:
@@ -110,7 +170,7 @@ class PositionControlTestCase(unittest.TestCase):
             result_list.append(self.gp_obj.get_actual_position())
         print result_list
         assert result_list==target_list, "fail reaching the target"
-        
+         
 
 if __name__ == '__main__':
 #     unittest.main() # run all tests
