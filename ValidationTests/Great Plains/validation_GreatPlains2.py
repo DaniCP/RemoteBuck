@@ -4,7 +4,6 @@ import sys, os
 from time import sleep
 import time
 from bitstring import BitString, BitArray
-from lib2to3.pgen2.token import RPAR
 
 sys.path.append(os.getcwd() + '\..\..\CAN')
 import can_handler
@@ -30,9 +29,9 @@ class VelocityControlTestCase(unittest.TestCase):
         self.gp_obj.set_speed(0)
         self.gp_obj.heartbeat_stop()
         
-    def _test_target_reached(self):
+    def test_target_reached(self):
         '''check target reached when +-2 rpm'''
-        speed_target = 60
+        speed_target = 30
         self.gp_obj.set_speed(speed_target)
         time_start = time.time()
         timeout = 10 # seconds
@@ -122,7 +121,7 @@ class PositionControlTestCase(unittest.TestCase):
         actual_pos = self.gp_obj.get_actual_position()
         assert actual_pos == max_allowed
     
-    def test_process_new_speed_after_finish(self):                    
+    def _test_process_new_speed_after_finish(self):                    
         pos_target = 5
         tol_per = 15    # percentage tolerance
         timeout = False
@@ -152,13 +151,15 @@ class PositionControlTestCase(unittest.TestCase):
 #         print "real rpms: ", rpm
 #         assert rpm < 60+tol_per*60/100.0 and rpm > 60-tol_per*60/100.0
         
-    def test_process_new_pos_target_after_finish(self):
+    def _test_process_new_pos_target_after_finish(self):
         pass
     
     def _test_position_accuracy(self):
         ''' improvement: should be checked externally, internally always get error 0'''
         target_list = [1,2,3,4,5]
         result_list = []
+#         self.gp_obj.set_speed(3)
+        
         for i in target_list:
             self.gp_obj.set_pos_target(i)
             time_start = time.time()

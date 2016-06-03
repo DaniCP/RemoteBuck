@@ -39,6 +39,7 @@ class can_handler():
         self.canLib = canlib.canlib()
         self.reader_period = 0.01 #seconds
         self.old_read_msg = ''
+        self.read_msg_list = []
 
     def configure(self, bus_type='J1939'):
         '''Function to open channel, set bitrate, and enable bus
@@ -73,7 +74,7 @@ class can_handler():
         try:
             self.ch1.write(msgId, msg, flg)
 #             sleep(0.100)
-            sleep(0.005)
+            sleep(0.001)
         except:
             print "*************************    EXCEPTION WHILE WRITE    **********************"
             sleep(0.3)
@@ -107,6 +108,18 @@ class can_handler():
         self.th_reader = threading.Timer(self.reader_period, self.reader_start)
         self.th_reader.start()
         self.old_read_msg = msg_received
+
+    def reset_reader_counter(self):
+        self.read_msg_list = []
+
+    def reader_counter(self):
+        try:
+            while True:
+                msgId, msg, dlc, flg, time = self.ch1.read(timeout=200)
+                msg_received = "".join("0x%02x " % b for b in msg)
+                self.read_msg_list.append((time, msgId, msg_received))
+        except:
+            return self.read_msg_list
 
     def stop_reader(self):
         self.th_reader.cancel()

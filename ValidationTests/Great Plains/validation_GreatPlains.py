@@ -113,6 +113,39 @@ class greate_plains():
         pos.append("0x%02x " % msg[4])
         return pos.uint/81.0 
     
+    def get_voltage(self):
+        self.can_h.send_msg((0x40, 0x00, 0x23, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+        msg, msgId, time = self.can_h.read_msg()
+        
+        while not (msg[0]==0x4B and msg[1]==0x00 and msg[2]==0x23):
+            msg, msgId, time = self.can_h.read_msg()
+            
+        voltage = BitString("0x%02x " % msg[5])
+        voltage.append("0x%02x " % msg[4])
+        return voltage.uint
+    
+    def get_temperature(self):
+        self.can_h.send_msg((0x40, 0x02, 0x23, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+        msg, msgId, time = self.can_h.read_msg()
+        
+        while not (msg[0]==0x4B and msg[1]==0x02 and msg[2]==0x23):
+            msg, msgId, time = self.can_h.read_msg()
+            
+        temp = BitString("0x%02x " % msg[5])
+        temp.append("0x%02x " % msg[4])
+        return temp.uint
+    
+    def get_status(self):
+        self.can_h.send_msg((0x40, 0x00, 0x21, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+        msg, msgId, time = self.can_h.read_msg()
+        
+        while not (msg[0]==0x4B and msg[1]==0x00 and msg[2]==0x21):
+            msg, msgId, time = self.can_h.read_msg()
+            
+        status = BitString("0x%02x " % msg[5])
+        status.append("0x%02x " % msg[4])
+        return status.uint
+    
     def wait_till_error(self, timeout):
 #         self.can_h.send_msg((0x40, 0x41, 0x60, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = None, None, None
