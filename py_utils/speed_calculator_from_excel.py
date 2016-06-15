@@ -45,6 +45,8 @@ for row in reader:
         header = row
     else:
         new_pos = float(row[5].replace(',', '.'))  # read encoder pos, column 5
+        if (old_pos == 0 and new_pos != 0):
+            row_of_first_data = rownum
         if new_pos != old_pos:
             pos_list.append(new_pos)  # get position
 
@@ -60,14 +62,19 @@ for row in reader:
             changes_counter += 1
             last_change_row_num = rownum
             old_pos = new_pos
-            old_speed  = speed
+            old_speed = speed
 
     rownum += 1
 
 
 '''moving avg'''
-speed_averaged = np.convolve(speed_list, np.ones((10,))/10, mode='valid')
-time_avg = np.convolve(time_list, np.ones((10,))/10, mode='valid')
+num_elem_avg = 100
+speed_averaged = np.convolve(speed_list, np.ones((num_elem_avg,))/num_elem_avg, mode='valid')
+time_avg = np.convolve(time_list, np.ones((num_elem_avg,))/num_elem_avg, mode='valid')
+
+'print average speed'
+print args.filename, " speed: ", abs(np.mean(speed_averaged))
+print "speed in 30s: ", new_pos*60/((rownum-row_of_first_data)*0.00005*360)
 
 '''ploting'''
 fig = plt.figure(1)
@@ -86,5 +93,5 @@ if not os.path.exists(args.path +'images/'):
 plt.savefig(args.path +'images/'+ args.filename[:-5] +'.png')
 # plt.show()
 
-print "number of rows: ", rownum, " changes_counter: ", changes_counter
+# print "number of rows: ", rownum, " changes_counter: ", changes_counter
 ifile.close()

@@ -2,12 +2,18 @@
 Created on 3 de jun. de 2016
 
 @author: daniel.cano
+Descripcion:
+busca el CSV, genera la imagen de la grafica de posicion capturada
+por el util de verificacion.
+Luego genera un word con todas las imagenes
 '''
 import os
 from docx import Document
 
 filename = ''
-path = 'D:/Workspace/Verificaciones/16_06_01_GreatPlains/'
+# path = 'D:/Workspace/Verificaciones/16_06_01_GreatPlains/'
+path = 'D:/Workspace/Verificaciones/GP_Speed_range/'
+
 '''search for .csv and generate graphs'''
 for root, dirs, files in os.walk(path):
     for name in files:
