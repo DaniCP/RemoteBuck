@@ -2,9 +2,10 @@
 import ctypes as ct
 import sys
 import struct
-import logging
 import inspect
 from bitstring import BitArray, Bits
+import Queue
+import logging
 
 from time import sleep
 import time
@@ -31,6 +32,39 @@ class periodic_frame_sender():
         self.th_periodic.start()
 
     def stop_frame(self):
+        self.th_periodic.cancel()
+
+
+class periodic_reader():
+    def __init__(self, can_h=None, period=0.1, logger=None):
+        self.can_h = can_h
+        self.period = period  # seconds
+        self.th_periodic = None
+        self.read_msg_list = []
+        self.rx_queue = Queue.Queue()
+        self.logger = logger
+
+    def configure(self, period=None):
+        self.can_h = can_h
+        self.period = period
+
+    def read_buffer(self):
+        try:
+            while True:
+                msgId, msg, dlc, flg, time = self.can_h.ch1.read(timeout=1)
+                msg_received = "".join("0x%02x " % b for b in msg)
+                self.logger.info('%s %s %s %s', time, dlc, msgId, msg_received)
+                self.rx_queue.put((time, msgId, msg_received))
+        except:
+#             print "msg_count:\n", self.rx_queue.get()
+            self.th_periodic = threading.Timer(self.period, self.read_buffer)
+            self.read_msg_list = []
+            self.th_periodic.start()
+
+    def start_to_read(self):
+        self.read_buffer()
+
+    def stop_reader(self):
         self.th_periodic.cancel()
 
 
@@ -124,59 +158,15 @@ class can_handler():
     def stop_reader(self):
         self.th_reader.cancel()
 
-    def start_heartbeat(self):
-        heartbeat = [0x7F]
-        self.send_msg(heartbeat, 0x764)
-        self.th_HB = threading.Timer(0.5, self.start_heartbeat)
-        self.th_HB.start()
-
-    def stop_heartbeat(self):
-        self.th_HB.cancel()
 
 def grade_plane_actions(can_h):
     '''function for debug stage'''
-    msgId = 0x601
-    OFF = 0x00
-    ON = 0x01
-
-    can_h.send_msg([0x01, 0x00], 0x00)# from pre-operational to operational
-
-    msg_clear_error = (0x2f, 0x02, 0x21, 0x01, 0x01, 0x00, 0x00, 0x00)
-    msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x02, 0x00, 0x00, 0x00)#speed mode
-#     msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x01, 0x00, 0x00, 0x00)#position mode
-    msg_set_speed = (0x23, 0x01, 0x22, 0x00, 0x1a, 0x4f, 0x00, 0x00)
-#     msg_set_speed = (0x23, 0x01, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00)
-    msg_break_on = (0x2f, 0x04, 0x21, 0x00, OFF, 0x00, 0x00, 0x00)
-    msg_set_heartbeat = (0x23, 0x16, 0x10, 0x01, 0xdc, 0x05, 0x64, 0x00)
-
-    write_buffer = (msg_mode_speed, msg_set_speed, msg_break_on, msg_set_heartbeat, msg_clear_error)
-
-    """bus interaction"""
-#     can_h.start_heartbeat()
-    heartbeat = periodic_frame_sender(can_h=can_h, period=0.5, msgId=0x764, msg=[0x7F])
-    heartbeat.start_frame()
-
-    for msg in write_buffer:
-        can_h.send_msg(msg, msgId)
-#         can_h.read_msg_and_print()
-
-    sleep(1)
-#     can_h.stop_heartbeat()
-    heartbeat.stop_frame()
-    print '**** END PROGRAM ****'
-
-
-if __name__ == '__main__':
-
     msg_clear_error = (0x2f, 0x02, 0x21, 0x01, 0x01, 0x00, 0x00, 0x00)
     msg_mode_speed = (0x2f, 0x03, 0x21, 0x00, 0x02, 0x00, 0x00, 0x00)#speed mode
     msg_set_speed = (0x23, 0x01, 0x22, 0x00, 0x1a, 0x4f, 0x00, 0x00)
     msg_break_on = (0x2f, 0x04, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00)
     msg_set_heartbeat = (0x23, 0x16, 0x10, 0x01, 0xdc, 0x05, 0x64, 0x00)
     write_buffer = (msg_mode_speed, msg_set_speed, msg_break_on, msg_set_heartbeat, msg_clear_error)
-
-    can_h = can_handler()
-    can_h.configure()
 
     '''actions'''
     while True:
@@ -187,6 +177,24 @@ if __name__ == '__main__':
         can_h.send_msg([0x7F], 0x764)
         sleep(1)
 
-#     grade_plane_actions(can_h)
-    #     can_h.reader_start()
+
+if __name__ == '__main__':
+    can_h = can_handler()
+
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler('hello.log')
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.info('Hello baby')
+
+#     can_h.configure('CANOpen')
+    can_h.configure()
+    reader = periodic_reader(can_h, 0.2, logger)
+    reader.start_to_read()
+    sleep(5)
+    reader.stop_reader()
+
     print '**** END PROGRAM ****'

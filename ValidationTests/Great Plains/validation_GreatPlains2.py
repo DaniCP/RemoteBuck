@@ -29,7 +29,7 @@ class VelocityControlTestCase(unittest.TestCase):
         self.gp_obj.set_speed(0)
         self.gp_obj.heartbeat_stop()
         
-    def test_target_reached(self):
+    def _test_target_reached(self):
         '''check target reached when +-2 rpm'''
         speed_target = 30
         self.gp_obj.set_speed(speed_target)
@@ -43,7 +43,7 @@ class VelocityControlTestCase(unittest.TestCase):
          
         assert abs(speed_target - actual_speed) < 2, "Target reached FAIL"
         
-    def test_stop_when_speed0(self):
+    def _test_stop_when_speed0(self):
         speeds = [25, 40, 60]
         for i in range(0,3):
             self.gp_obj.set_speed(speeds[i])
@@ -57,7 +57,7 @@ class VelocityControlTestCase(unittest.TestCase):
                 actual_speed = self.gp_obj.get_actual_speed()
                 assert actual_speed == 0, "motor does not stop after set speed = 0"
 
-    def test_acceleration(self):
+    def _test_acceleration(self):
         '''to check the acceleration parameter is functional
         only time variation checked
         We can not ensure that the motor is reaching the desired acceleration'''
@@ -76,6 +76,24 @@ class VelocityControlTestCase(unittest.TestCase):
 #         print list
         print 'non aplicable test' 
         assert time_spent < 1.5, "acceleration fail"
+        
+    def test_low_speed_targets(self):
+        actual_velocity_list = []
+        targets_list = [3, 10, 5]#, 14, 5, 18, 5, 0, 5]
+        target_time = 3
+        
+        for target in targets_list:
+            self.gp_obj.set_speed(target)           
+            time_start = time.time()
+            speed = self.gp_obj.get_actual_speed()
+            
+            while (time.time()-time_start < target_time):
+                speed = self.gp_obj.get_actual_speed()
+                actual_velocity_list.append((time.time()-time_start,speed))
+                sleep(0.05)
+                
+        print actual_velocity_list
+        assert True
 
 class PositionControlTestCase(unittest.TestCase):
 
@@ -97,7 +115,7 @@ class PositionControlTestCase(unittest.TestCase):
         self.gp_obj.set_speed(0)
         self.gp_obj.heartbeat_stop()
         
-    def test_move_to_pos_using_velocity_command(self):
+    def _test_move_to_pos_using_velocity_command(self):
         speed_list = [60, 30, 10]
         tol_per = 15    #    tolerance percentage
         in_progress_speed_list = []
@@ -113,7 +131,7 @@ class PositionControlTestCase(unittest.TestCase):
             print "real rpms: ", rpm
             assert rpm < i+tol_per*i/100.0 and rpm > i-tol_per*i/100.0
             
-    def test_target_higher_than_allowed(self):
+    def _test_target_higher_than_allowed(self):
         max_allowed = 5
         self.gp_obj.set_pos_target(8)
         while (not self.gp_obj.get_target_reached()=='1'):
@@ -122,7 +140,7 @@ class PositionControlTestCase(unittest.TestCase):
         actual_pos = self.gp_obj.get_actual_position()
         assert actual_pos == max_allowed
     
-    def test_process_new_speed_after_finish(self):                    
+    def _test_process_new_speed_after_finish(self):                    
         pos_target = 5
         tol_per = 15    # percentage tolerance
         timeout = False
@@ -153,10 +171,10 @@ class PositionControlTestCase(unittest.TestCase):
 #         print "real rpms: ", rpm
 #         assert rpm < 60+tol_per*60/100.0 and rpm > 60-tol_per*60/100.0
         
-    def test_process_new_pos_target_after_finish(self):
+    def _test_process_new_pos_target_after_finish(self):
         pass
     
-    def test_position_accuracy(self):
+    def _test_position_accuracy(self):
         ''' improvement: should be checked externally, internally always get error 0'''
         target_list = [1,2,3,4,5]
         result_list = []
@@ -176,8 +194,8 @@ class PositionControlTestCase(unittest.TestCase):
          
 
 if __name__ == '__main__':
-#     unittest.main() # run all tests
-    test_class = eval(sys.argv[1])
-    suite = unittest.TestLoader().loadTestsFromTestCase(PositionControlTestCase)
-    unittest.TextTestRunner().run(suite)
+    unittest.main() # run all tests
+#     test_class = eval(sys.argv[1])
+#     suite = unittest.TestLoader().loadTestsFromTestCase(VelocityControlTestCase)
+#     unittest.TextTestRunner().run(suite)
     print '**** END PROGRAM ****'
