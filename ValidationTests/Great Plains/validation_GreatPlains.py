@@ -3,6 +3,7 @@ import sys, os
 from time import sleep
 import time
 from bitstring import BitString, BitArray
+import matplotlib.pyplot as plt
 
 sys.path.append(os.getcwd() + '\..\..\CAN')
 import can_handler
@@ -66,17 +67,38 @@ class greate_plains():
         high, low = self.bytes(pos_armature)
         self.can_h.send_msg((0x23, 0x7a, 0x60, 0x00, low, high, 0x00, 0x00), self.node_id)
         
+    def get_motor_velocity_command(self):
+        try:
+            self.can_h.send_msg((0x40, 0x01, 0x22, 0x00, 00, 00, 0x00, 0x00), self.node_id)
+            msg, msgId, time = self.can_h.read_msg()
+            
+            while not (msg[0]==0x43 and msg[1]==0x01 and msg[2]==0x22):
+                try:
+                    msg, msgId, time = self.can_h.read_msg()
+                except:
+                    speed = None
+            
+            speed = BitString("0x%02x " % msg[5])
+            speed.append("0x%02x " % msg[4])
+            return speed.uint/810.0
+        except:
+            return None
+        
     def get_actual_speed(self):
         '''returned speed in shaft'''
         self.can_h.send_msg((0x40, 0x02, 0x22, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = self.can_h.read_msg()
         
         while not (msg[0]==0x43 and msg[1]==0x02 and msg[2]==0x22):
-            msg, msgId, time = self.can_h.read_msg()
+            try:
+                msg, msgId, time = self.can_h.read_msg()
+            except:
+                speed = None
             
         speed = BitString("0x%02x " % msg[5])
         speed.append("0x%02x " % msg[4])
         return speed.uint/810.0
+#         return speed.int
     
     def get_motor_current(self):
         '''returned in milliamperes '''
@@ -293,6 +315,56 @@ class test():
     def test_interf_2(self):
         '''Node ID: 0x2000'''
         write_node_id2 = (0x2f, 0x00, 0x20, 0x00, 0x02, 0x00, 0x00)
+        
+    ''' VELOCITY CONTROL TESTS'''
+    def test_low_speed_targets(self):
+        self.gp_obj.set_mode(2)
+        
+        actual_velocity_list = []
+        time_list = []
+        target_sampling = []
+        motor_target_list = []
+        target_reached_list = []
+        
+#         targets_list = [3, 10, 5, 14, 5, 18, 5, 0, 5, 0]
+        targets_list = [60, 3, 25]
+#         targets_list = [15, 5]
+        target_time = 10  # step time per each target
+        
+        time_start = time.time()
+        for target in targets_list:
+            print 'cambio de velocidad, speed: ', target
+            self.gp_obj.set_speed(target)           
+            step_time = time.time()
+            
+            while (time.time()-step_time < target_time):
+                speed = self.gp_obj.get_actual_speed()
+                motor_target = self.gp_obj.get_motor_velocity_command()
+                
+                actual_velocity_list.append(speed)
+                time_list.append(time.time()-time_start)
+                target_sampling.append(target)
+                motor_target_list.append(motor_target)
+                target_reached_list.append(self.gp_obj.get_target_reached())
+                sleep(0.01)
+                
+        self.gp_obj.set_speed(0)  # stop
+        print 'ploting'
+
+        '''ploting'''
+        fig = plt.figure(1)
+        plt.plot(time_list, actual_velocity_list, 'b', label="actual velocity")
+        plt.plot(time_list, target_sampling, 'g', label="target set by me")
+        plt.plot(time_list, motor_target_list, 'r', linestyle='--', label="target reported by motor")
+        plt.plot(time_list, target_reached_list, 'y', label="target reached")
+        fig.suptitle('actual_velocity_list', fontsize=12, fontweight='bold')
+        plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, mode="expand", borderaxespad=0.)
+        plt.ylabel('velocity [RPM]')
+        plt.xlabel('time [s]')
+        plt.grid(True)
+        plt.show()
+
     
 if __name__ == '__main__':
     can_h = can_handler.can_handler()
@@ -303,10 +375,8 @@ if __name__ == '__main__':
     '''test to execute: configure'''
     test_obj.setup()    
     
-    test_obj.test_vel_2()
-#     for i in range(1,10):
-#         print test_obj.gp_obj.get_motor_current()
-#         sleep(1)
+#     test_obj.test_vel_2()
+    test_obj.test_low_speed_targets()
         
     '''teardown'''
     test_obj.teardown()
