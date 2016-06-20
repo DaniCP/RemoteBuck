@@ -128,10 +128,14 @@ class can_handler():
 #         print("read: 0x%03x  %9d  0x%02x  %d  %s" % (msgId, time, flg, dlc, msg))
 
     def read_msg(self, timeout=2000):
-        msgId, msg, dlc, flg, time = self.ch1.read(timeout)
+        try:
+            msgId, msg, dlc, flg, time = self.ch1.read(timeout)
 #         msg_received = "".join("0x%02x " % b for b in msg)
 #         print 'read: ', msgId, msg, time
-        return msg, msgId, time
+            return msg, msgId, time
+        except:
+            print '*****    exception while READ    *****'
+            return -1, -1, -1
 
     '''trying to read periodic mesages'''
     def reader_start(self):

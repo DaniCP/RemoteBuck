@@ -4,6 +4,9 @@ from time import sleep
 import time
 from bitstring import BitString, BitArray
 import matplotlib.pyplot as plt
+import operator
+from numpy import ERR_CALL
+from compiler.ast import Node
 
 sys.path.append(os.getcwd() + '\..\..\CAN')
 import can_handler
@@ -12,8 +15,16 @@ class greate_plains():
     def __init__(self, can_h, node_id):
         self.can_h = can_h
         self.node_id = node_id
+        self.response_id = 0x580 + node_id - 0x600
         self.heartbeat = None
     
+    def setup(self):
+        self.set_operational()
+        self.set_heartbeat(1500)
+        self.set_brake(0)
+        self.heartbeat_start()
+        self.clear_errors() 
+        
     def bytes(self, integer):
         '''usefull function to split high and low byte'''
         return divmod(integer, 0x100)
@@ -56,7 +67,7 @@ class greate_plains():
         
     def set_speed(self,speed):
         '''speed argument in shaft'''
-        speed_armature = speed * 81 * 10
+        speed_armature = int(speed * 81 * 10)
         high, low = self.bytes(speed_armature)
 #         print hex(high), hex(low)
         self.can_h.send_msg((0x23, 0x01, 0x22, 0x00, low, high, 0x00, 0x00), self.node_id)
@@ -72,7 +83,7 @@ class greate_plains():
             self.can_h.send_msg((0x40, 0x01, 0x22, 0x00, 00, 00, 0x00, 0x00), self.node_id)
             msg, msgId, time = self.can_h.read_msg()
             
-            while not (msg[0]==0x43 and msg[1]==0x01 and msg[2]==0x22):
+            while not (msgId==self.response_id and msg[0]==0x43 and msg[1]==0x01 and msg[2]==0x22):
                 try:
                     msg, msgId, time = self.can_h.read_msg()
                 except:
@@ -89,7 +100,7 @@ class greate_plains():
         self.can_h.send_msg((0x40, 0x02, 0x22, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = self.can_h.read_msg()
         
-        while not (msg[0]==0x43 and msg[1]==0x02 and msg[2]==0x22):
+        while not (msgId==self.response_id and msg[0]==0x43 and msg[1]==0x02 and msg[2]==0x22):
             try:
                 msg, msgId, time = self.can_h.read_msg()
             except:
@@ -105,7 +116,7 @@ class greate_plains():
         self.can_h.send_msg((0x40, 0x01, 0x23, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = self.can_h.read_msg()
         
-        while not (msg[0]==0x4b and msg[1]==0x01 and msg[2]==0x23):
+        while not (msgId==self.response_id and msg[0]==0x4b and msg[1]==0x01 and msg[2]==0x23):
             msg, msgId, time = self.can_h.read_msg()
             
         current = BitString("0x%02x " % msg[5])
@@ -117,7 +128,7 @@ class greate_plains():
         self.can_h.send_msg((0x40, 0x41, 0x60, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = self.can_h.read_msg()
         
-        while not (msg[0]==0x4b and msg[1]==0x41 and msg[2]==0x60):
+        while not (msgId==self.response_id and msg[0]==0x4b and msg[1]==0x41 and msg[2]==0x60):
             msg, msgId, time = self.can_h.read_msg()
             
         target_reached = BitString("0x%02x " % msg[5]) 
@@ -128,7 +139,7 @@ class greate_plains():
         self.can_h.send_msg((0x40, 0x64, 0x60, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = self.can_h.read_msg()
         
-        while not (msg[0]==0x43 and msg[1]==0x64 and msg[2]==0x60):
+        while not (msgId==self.response_id and msg[0]==0x43 and msg[1]==0x64 and msg[2]==0x60):
             msg, msgId, time = self.can_h.read_msg()
             
         pos = BitString("0x%02x " % msg[5])
@@ -139,7 +150,7 @@ class greate_plains():
         self.can_h.send_msg((0x40, 0x00, 0x23, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = self.can_h.read_msg()
         
-        while not (msg[0]==0x4B and msg[1]==0x00 and msg[2]==0x23):
+        while not (msgId==self.response_id and msg[0]==0x4B and msg[1]==0x00 and msg[2]==0x23):
             msg, msgId, time = self.can_h.read_msg()
             
         voltage = BitString("0x%02x " % msg[5])
@@ -150,7 +161,7 @@ class greate_plains():
         self.can_h.send_msg((0x40, 0x02, 0x23, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = self.can_h.read_msg()
         
-        while not (msg[0]==0x4B and msg[1]==0x02 and msg[2]==0x23):
+        while not (msgId==self.response_id and msg[0]==0x4B and msg[1]==0x02 and msg[2]==0x23):
             msg, msgId, time = self.can_h.read_msg()
             
         temp = BitString("0x%02x " % msg[5])
@@ -161,7 +172,7 @@ class greate_plains():
         self.can_h.send_msg((0x40, 0x00, 0x21, 0x00, 00, 00, 0x00, 0x00), self.node_id)
         msg, msgId, time = self.can_h.read_msg()
         
-        while not (msg[0]==0x4B and msg[1]==0x00 and msg[2]==0x21):
+        while not (msgId==self.response_id and msg[0]==0x4B and msg[1]==0x00 and msg[2]==0x21):
             msg, msgId, time = self.can_h.read_msg()
             
         status = BitString("0x%02x " % msg[5])
@@ -181,23 +192,32 @@ class greate_plains():
         
         
 class test():
-    def __init__(self, can_h):
+    def __init__(self, can_h, num_nodes):
+        ''' constructor prepared to 2 Nodes. Not scalable yet '''
         self.can_h = can_h
-        self.gp_obj = greate_plains(can_h, 0x601)
+        if num_nodes==1:
+            self.gp_obj = greate_plains(can_h, 0x601)
+            self.gp_obj2 = greate_plains(can_h, 0x602)
+            self.gp_nodes_list = [self.gp_obj]
+        elif num_nodes==2:
+            self.gp_obj = greate_plains(can_h, 0x602)
+            self.gp_obj2 = greate_plains(can_h, 0x601)
+            self.gp_nodes_list = [self.gp_obj, self.gp_obj2]
+        else:
+            print 'num_nodes not allowed, only 1 or 2 supported'
+
         
     def approx_Equal(self, x, y, tolerance):
         return abs(x-y) <= tolerance
     
     def setup(self):
-        self.gp_obj.set_operational()
-        self.gp_obj.set_heartbeat(1500)
-        self.gp_obj.set_brake(0)
-        self.gp_obj.heartbeat_start()
-        self.gp_obj.clear_errors()        
+        for node in self.gp_nodes_list:
+            node.setup()       
     
     def teardown(self):
-        self.gp_obj.set_speed(0)
-        self.gp_obj.heartbeat_stop()
+        for node in self.gp_nodes_list:
+            node.set_speed(0)
+            node.heartbeat_stop()
         
     def test1(self):
         '''doc: to check the boot-up message every 5sec'''        
@@ -317,46 +337,56 @@ class test():
         write_node_id2 = (0x2f, 0x00, 0x20, 0x00, 0x02, 0x00, 0x00)
         
     ''' VELOCITY CONTROL TESTS'''
-    def test_low_speed_targets(self):
-        self.gp_obj.set_mode(2)
+    def test_speed_targets(self, targets_list=[], step_time=5, offset=0):
+        TIME_INDX = 0
+        VEL_INDX = 1
+        TARGET_INDX = 2
+        TARGET_REACH_INDX = 3
+        MOTOR2_TARGET_OFFSET =  offset #RPM
+        result_list = []
         
-        actual_velocity_list = []
-        time_list = []
-        target_sampling = []
-        motor_target_list = []
-        target_reached_list = []
-        
-#         targets_list = [3, 10, 5, 14, 5, 18, 5, 0, 5, 0]
-        targets_list = [60, 3, 25]
-#         targets_list = [15, 5]
-        target_time = 10  # step time per each target
+        for node in self.gp_nodes_list:
+            result_list.append([ [], [], [], [] ])
         
         time_start = time.time()
+        
         for target in targets_list:
             print 'cambio de velocidad, speed: ', target
-            self.gp_obj.set_speed(target)           
-            step_time = time.time()
+            for node in self.gp_nodes_list:
+                    node.set_mode(2)
+                    if self.gp_nodes_list.index(node)==0:
+                        node.set_speed(target)
+                    else:
+                        node.set_speed(target + MOTOR2_TARGET_OFFSET)
             
-            while (time.time()-step_time < target_time):
-                speed = self.gp_obj.get_actual_speed()
-                motor_target = self.gp_obj.get_motor_velocity_command()
+            start_step_time = time.time()
+            while (time.time()-start_step_time < step_time):
+                i = 0
+                for node in self.gp_nodes_list:
+                    result_list[i][TIME_INDX].append(time.time()-time_start)
+                    result_list[i][VEL_INDX].append(node.get_actual_speed())
+                    result_list[i][TARGET_INDX].append(node.get_motor_velocity_command())
+                    result_list[i][TARGET_REACH_INDX].append(self.gp_obj.get_target_reached())
+                    i += 1
                 
-                actual_velocity_list.append(speed)
-                time_list.append(time.time()-time_start)
-                target_sampling.append(target)
-                motor_target_list.append(motor_target)
-                target_reached_list.append(self.gp_obj.get_target_reached())
                 sleep(0.01)
                 
-        self.gp_obj.set_speed(0)  # stop
+        self.teardown()  # stop
+        
         print 'ploting'
-
+#         max_index, max_value = max(enumerate(actual_velocity_list), key=operator.itemgetter(1))
+#         min_index, min_value = min(enumerate(actual_velocity_list), key=operator.itemgetter(1))
+#         print 'max_speed: ', max_value, 'in second: ', time_list[max_index]
         '''ploting'''
         fig = plt.figure(1)
-        plt.plot(time_list, actual_velocity_list, 'b', label="actual velocity")
-        plt.plot(time_list, target_sampling, 'g', label="target set by me")
-        plt.plot(time_list, motor_target_list, 'r', linestyle='--', label="target reported by motor")
-        plt.plot(time_list, target_reached_list, 'y', label="target reached")
+        i = 0
+        for node in self.gp_nodes_list:
+            plt.plot(result_list[i][TIME_INDX], result_list[i][VEL_INDX], 'o', label="actual velocity node %d"%node.node_id)
+            plt.plot(result_list[i][TIME_INDX], result_list[i][TARGET_INDX], linestyle='--', label="target reported by motor node %d"%node.node_id)
+            plt.plot(result_list[i][TIME_INDX], result_list[i][TARGET_REACH_INDX], label="target reached node %d"%node.node_id)
+            i += 1
+        
+        
         fig.suptitle('actual_velocity_list', fontsize=12, fontweight='bold')
         plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
            ncol=2, mode="expand", borderaxespad=0.)
@@ -365,18 +395,27 @@ class test():
         plt.grid(True)
         plt.show()
 
+    def test_accuracy_motor(self):
+        self.test_speed_targets([20, 25], step_time=5, offset=0.5)
+        
+    def test_high_speed_motor(self):
+        self.test_speed_targets(targets_list=[10, 30, 60, 20, 45, 60, 5, 30], step_time=5)
+        
+    def test_low_speed_motor(self):
+        self.test_speed_targets(targets_list=[3, 10, 5, 14, 5, 18, 5, 0, 5], step_time=10)
+        
     
 if __name__ == '__main__':
     can_h = can_handler.can_handler()
     can_h.configure('CANOpen')
 
-    test_obj = test(can_h)
+    test_obj = test(can_h, num_nodes=2)
   
     '''test to execute: configure'''
     test_obj.setup()    
     
 #     test_obj.test_vel_2()
-    test_obj.test_low_speed_targets()
+    test_obj.test_accuracy_motor()
         
     '''teardown'''
     test_obj.teardown()
