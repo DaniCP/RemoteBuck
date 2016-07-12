@@ -13,7 +13,7 @@ from docx import Document
 filename = ''
 # path = 'D:/Workspace/Verificaciones/16_06_01_GreatPlains/'
 # path = 'D:/Workspace/Verificaciones/GP_Speed_range/'
-path = 'E:/'
+path = 'D:/Workspace/Verificaciones/16_07_04_ADT/'
 
 '''search for .csv and generate graphs'''
 for root, dirs, files in os.walk(path):

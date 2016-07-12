@@ -3,7 +3,7 @@ import sys, os
 from time import sleep
 from bitstring import BitString, BitArray
 
-sys.path.append(os.getcwd() + '\..\..\CAN') #anadir para linux
+sys.path.append(os.getcwd() + '\..\..\CAN')
 import can_handler
 
 
