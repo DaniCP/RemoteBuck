@@ -20,12 +20,13 @@ MEDIUM = BitArray(hex='0x2')
 HIGH = BitArray(hex='0x3')
 DELAYED1 = BitArray(hex='0x4')
 DELAYED2 = BitArray(hex='0x5')
+NOT_AVAILABLE = BitArray(hex='0xF')
 
 WASH_OFF = BitArray(bin='000')
 WASH_ON = BitArray(bin='001')
 WASH_MEDIUM = BitArray(bin='010')
 WASH_HIGH = BitArray(bin='011')
-
+WASH_NOT_AVAILABLE = BitArray(bin='111')
 
 class OWW():
     '''Class to manage the wiper J1939 compatible
@@ -33,8 +34,8 @@ class OWW():
     def __init__(self):
         self.can_h = can_handler.can_handler()
         self.can_h.configure('J1939')
-        self.id_ = 64973  # 0x1C FDCD 00
-        self.rx_can_id = 0x1CFDCDEB
+        self.id_ = 64973  # 0x18 FDCD 00
+        self.rx_can_id = 0x18FDCDEB
 
         self.frontOperatorWiperSwitch = BitArray(bin='0000')        #_2863,4,1,4,U,15,0,1,0.000000,1.000000,,
         self.FrontNonOperatorWiperSwitch = BitArray(bin='0000')     #_2864,4,1,0,U,15,0,1,0.000000,1.000000,,
@@ -49,7 +50,7 @@ class OWW():
         self.RearWiperDelayControl = BitArray(bin='00000000')               #_2871,8,5,0,U,255,0,1,0.000000,0.400000,%,
 
         self.pgn = can_handler.periodic_frame_sender(can_h=self.can_h,
-                                                     period=0.5, msgId=0x1CFDCD00,
+                                                     period=0.5, msgId=0x18FDCD00,
                                                      msg=self.encode_msg())
         self.pgn.start_frame()
         # echo checker
@@ -70,6 +71,7 @@ class OWW():
         by6 = (self.RearWasherFunction + BitArray(bin='00000')).uint
         by7 = 0
         msg = (by0, by1, by2, by3, by4, by5, by6, by7)
+        print 'encode msg: ', msg
         return msg
 
     def stop(self):
@@ -81,7 +83,7 @@ class OWW():
         self.can_h.__del__()
 
     def broadcast_setup(self, dest_add='0xff', src_add='0x00'):
-        msgId = BitArray(BitArray('0x1CDF')+BitArray(dest_add)+BitArray(src_add))
+        msgId = BitArray(BitArray('0x18DF')+BitArray(dest_add)+BitArray(src_add))
         self.can_h.send_msg([0x00, 0x00, 0x3F, 0xFF, 0xFF,
                              0xFF, 0xFF, 0xFF], msgId=msgId.int)
 
@@ -89,7 +91,7 @@ class OWW():
         self.broadcast.stop_frame()
 
     def stop_hold_broadcast(self, dest_add='0xff', src_add='0x00'):
-        msgId = BitArray(BitArray('0x1CDF')+BitArray(dest_add)+BitArray(src_add))
+        msgId = BitArray(BitArray('0x18DF')+BitArray(dest_add)+BitArray(src_add))
         self.broadcast = can_handler.periodic_frame_sender(can_h=self.can_h,
                                                            period=5,
                                                            msgId=msgId.int,
@@ -140,6 +142,7 @@ class Diag_Manager():
     CMD_READ = '0b001'
     CMD_WRITE = '0b010'
     CMD_OP_COMPLETED = '0b100'
+    CMD_OP_FAIL = '0b101'
 
     P_TYPE_DIRECT = '0b0'
     P_TYPE_SPATIAL = '0b1'
@@ -151,18 +154,19 @@ class Diag_Manager():
 
     def __init__(self, can_h):
         self.can_h = can_h
-        self.tp = Transport_Protocol.Transport_Protocol()
+        self.tp = Transport_Protocol.Transport_Protocol(self)
         self._psw = '0xD204'
 
-    def _wait_for_id(self, _id, timeout=5):
+    def _wait_for_id(self, _id, timeout=10):
         t_start = time.time()
-        msg, msgId, _time = self.can_h.read_msg()
+        msg, msgId, _time = self.can_h.read_msg(timeout*1000)
         while not (msgId == _id):
             try:
                 msg, msgId, _time = self.can_h.read_msg()
                 if time.time()-t_start > timeout:
-                    print 'timeout waiting for id'
-                    break
+                    print 'timeout waiting for id', _id, time.time()-t_start
+                    return 0
+#                     break
             except:
                 print 'exception waiting for id: ', _id
                 sleep(0.05)
@@ -179,7 +183,7 @@ class Diag_Manager():
 
     def dm14_composer(self, length='0b00000000001', p_type=P_TYPE_SPATIAL,
                       cmd=CMD_READ, _spn='0x000000', p_extension='0x00',
-                      _psw='0x04D2'):
+                      _psw='0x04D2', _src=TOOL_ID):
         ''' Memory access request'''
         by1 = BitString(length)[-8:].uint
         by2 = (BitString(length)[:-8] + BitString(p_type) + BitString(cmd) + '0b1').uint
@@ -191,7 +195,21 @@ class Diag_Manager():
         by8 = BitString(_psw)[:-8].uint
 
         msg = (by1, by2, by3, by4, by5, by6, by7, by8)
-        self.can_h.send_msg(msg=msg, msgId=self._id_composer(_pgn=self.PGN_DM14))
+        self.can_h.send_msg(msg=msg, msgId=self._id_composer(_pgn=self.PGN_DM14, src_add=_src))
+
+    def dm15_composer(self, length='0b00000000000', status=STATUS_COMPLETE, error_indicator='0xffffff', edcp_extension='0x00', seed='0x0000', _src=TOOL_ID):
+        ''' Memory access response'''
+        by1 = BitString(length)[-8:].uint
+        by2 = (BitString(length)[:-8]+'0b0'+BitString(status)+'0b0').uint
+        by3 = BitString(error_indicator)[-8:].uint
+        by4 = BitString(error_indicator)[-16:-8].uint
+        by5 = BitString(error_indicator)[-24:-16].uint
+        by6 = BitString(edcp_extension).uint
+        by7 = BitString(seed)[-8:].uint
+        by8 = BitString(seed)[:-8].uint
+
+        msg = (by1, by2, by3, by4, by5, by6, by7, by8)
+        self.can_h.send_msg(msg=msg, msgId=self._id_composer(_pgn=self.PGN_DM15, src_add=_src))
 
     def dm15_decoder(self, msg):
         msg = BitString(msg)
@@ -213,10 +231,18 @@ class Diag_Manager():
 
         return status, length, error_indicator
 
-    def dm16_composer(self, msg):
+    def dm16_decoder(self, msg):
+        msg = BitString(msg)
+        len = msg[:8].uint
+        data = msg[8:8*len+8]
+        not_used = msg[8*len+8:]
+        return data, not_used
+
+    def dm16_composer(self, msg, _src=TOOL_ID):
         ''' msg should be a str '''
         msg = BitString(msg)
-        if ((msg.len % 8) != 0 or msg.len > 7*8): # debe ser multiplo de 8 y menor que 7
+        if ((msg.len%8) != 0 or msg.len > 8*8): # debe ser multiplo de 8 y menor que 7
+            print 'incorrect len:', msg.len
             raise Exception
         else:
             msg = BitString(uint=msg.len/8, length=8) + msg
@@ -224,7 +250,7 @@ class Diag_Manager():
                 msg.append(BitString('0b1'))
         msg = (msg[:8].uint, msg[8:16].uint, msg[16:24].uint, msg[24:32].uint,
                msg[32:40].uint, msg[40:48].uint, msg[48:56].uint, msg[56:64].uint)
-        self.can_h.send_msg(msg=msg, msgId=self._id_composer(_pgn=self.PGN_DM16))
+        self.can_h.send_msg(msg=msg, msgId=self._id_composer(_pgn=self.PGN_DM16, src_add=_src))
 
     def commanded_address_composer(self, id_num, manuf_code, Func_inst,
                                    ecu_inst, func, vcl_sys, aac, ig, vsi,
@@ -234,12 +260,21 @@ class Diag_Manager():
 
 
 class Katana():
+    DELAY_CONTINUOUS = BitArray(bin='00000000')
+    DELAY_STOP = BitArray(bin='11111011')
+    DELAY_NOT_AVAILABLE = BitArray(bin='11111111')
+
     def __init__(self):
         self.wiper = OWW()
 
     def __del__(self):
         print 'delete katana'
         self.wiper.stop()
+
+    def _reset(self, dest_add='0xeb'):
+        msgId = BitArray(BitArray('0x18D6')+BitArray(dest_add)+'0xFC')
+        self.wiper.can_h.send_msg([0x06, 00, 00, 00, 00, 00, 00, 00], msgId.int)  # reset command sigma
+        sleep(4)
 
     def set_speed(self, speed=OFF):
         self.wiper.frontOperatorWiperSwitch = speed
@@ -249,8 +284,17 @@ class Katana():
         self.wiper.FrontOperatorWasherSwitch = cmd
         self.wiper.update_operator()
 
-    def set_delay_percentage(self, delay):
-        pass
+    def calculate_delay_perc(self, perc=0.4):
+        ''' input: int 0.4-100
+            output: bitstring 00000001 is 0,4%
+                              11111010 is 100%
+        '''
+        perc = perc * 0b11111010 / 100
+        return BitString(uint=int(perc), length=8)
+
+    def set_delay_percentage(self, delay=DELAY_STOP):
+        self.wiper.FrontOperatorWiperDelayControl = delay
+        self.wiper.update_operator()
 
 if __name__ == '__main__':
     wiper = Katana()
@@ -258,10 +302,10 @@ if __name__ == '__main__':
 
     diag.dm14_composer(_spn='0x000B15', cmd=diag.CMD_WRITE)
     sleep(0.5)
-    rx = diag._wait_for_id('0x1cd8fceb')
+    rx = diag._wait_for_id('0x18d8fceb')
     diag.dm15_decoder(rx)
     diag.dm16_composer('0xaabbccdd')
-    rx = diag._wait_for_id('0x1cd8fceb')
+    rx = diag._wait_for_id('0x18d8fceb')
     diag.dm15_decoder(rx)
 
     sleep(2)

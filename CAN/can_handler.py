@@ -24,9 +24,14 @@ class periodic_frame_sender():
         self.msg = msg
 
     def start_frame(self):
-        self.can_h.send_msg(self.msg, self.msgId)
-        self.th_periodic = threading.Timer(self.period, self.start_frame)
-        self.th_periodic.start()
+        try:
+            self.can_h.send_msg(self.msg, self.msgId)
+            self.th_periodic = threading.Timer(self.period, self.start_frame)
+            self.th_periodic.start()
+        except:
+            print 'exception starting the frame, msg:', self.msg
+            self.th_periodic = threading.Timer(self.period, self.start_frame)
+            self.th_periodic.start()
 
     def stop_frame(self):
         print 'stop periodic frame sender ID: %d' % self.msgId
@@ -225,7 +230,7 @@ if __name__ == '__main__':
     can_h = can_handler()
 #     can_h.configure('CANOpen')
     can_h.configure()
-    
+    can_h.send_msg([0x06, 00, 00, 00, 00, 00, 00, 00], 0x1cd6fffc)  # reset command sigma
     sleep(5)
     can_h.reader.stop_reader()
 
